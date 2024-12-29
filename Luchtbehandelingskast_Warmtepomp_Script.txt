@@ -1,0 +1,842 @@
+; ====================================================================================
+; SCHNEIDER ELECTRIC SCRIPT EDITOR - LUCHTBEHANDELINGSKAST MET WARMTEPOMP
+; ====================================================================================
+; Compleet besturingssysteem voor een luchtbehandelingskast met warmtepomp
+; Gebaseerd op Script_Editor_Syntax_Rules.txt
+; 
+; Componenten:
+; - Buitenlucht aanzuiging met damper
+; - Luchtfilters (G4 en F7)
+; - Warmtepomp (verwarming/koeling)
+; - Bevochtiger
+; - Ventilator (aanzuig en afvoer)
+; - Mengkamer met damper besturing
+; - Terugvoerlucht
+; - By-pass damper
+; ====================================================================================
+
+; ====================================================================================
+; 1. INPUT VARIABELEN DECLARATIE
+; ====================================================================================
+
+; Temperatuur sensoren
+Numeric Input BuitenluchtTemperatuur          ; Buitenlucht temperatuur sensor (°C)
+Numeric Input AanzuigluchtTemperatuur         ; Temperatuur na mengkamer (°C)
+Numeric Input TerugvoerluchtTemperatuur       ; Terugvoerlucht temperatuur (°C)
+Numeric Input ToevoerluchtTemperatuur         ; Toevoerlucht temperatuur sensor (°C)
+Numeric Input WarmtepompAanzuigTemperatuur    ; Temperatuur aanzuig warmtepomp (°C)
+Numeric Input WarmtepompAblaasTemperatuur     ; Temperatuur afgifte warmtepomp (°C)
+
+; Vochtigheid sensoren
+Numeric Input BuitenluchtVochtigheid          ; Relatieve luchtvochtigheid buitenlucht (%)
+Numeric Input ToevoerluchtVochtigheid         ; Relatieve luchtvochtigheid toevoerlucht (%)
+Numeric Input TerugvoerluchtVochtigheid       ; Relatieve luchtvochtigheid terugvoerlucht (%)
+
+; Druk sensoren
+Numeric Input FilterDrukverschilG4            ; Drukverschil filter G4 (Pa)
+Numeric Input FilterDrukverschilF7            ; Drukverschil filter F7 (Pa)
+Numeric Input VentilatorAanzuigDruk           ; Druk aanzuigzijde ventilator (Pa)
+Numeric Input VentilatorAblaasDruk            ; Druk afblaaszijde ventilator (Pa)
+
+; Bediening en modus selectie
+Numeric Input BedieningsModus                 ; 0=Uit, 1=Automatisch, 2=Handmatig, 3=Nachtmodus
+Numeric Input HandmatigeVentilatorSnelheid    ; Handmatige snelheid 0-100%
+Numeric Input HandmatigeWarmtepompModus      ; 0=Uit, 1=Verwarmen, 2=Koelen
+Numeric Input HandmatigeWarmtepompSetpoint    ; Handmatige setpoint temperatuur (°C)
+
+; Veiligheidsinvoer
+Numeric Input Noodstop                        ; Noodstop schakelaar (1=Noodstop actief)
+Numeric Input Brandalarm                      ; Brandalarm signaal (1=Alarm actief)
+Numeric Input VentilatorBeveiliging           ; Ventilator beveiliging (1=OK, 0=Beveiliging)
+Numeric Input WarmtepompBeveiliging           ; Warmtepomp beveiliging (1=OK, 0=Beveiliging)
+
+; Tijdsafhankelijke inputs
+Numeric Input Bezetting                       ; Bezetting detector (1=Bevat, 0=Onbezet)
+Numeric Input VrijgaveBevochtiger             ; Vrijgave bevochtiger (1=Toegestaan, 0=Niet toegestaan)
+
+; ====================================================================================
+; 2. OUTPUT VARIABELEN DECLARATIE
+; ====================================================================================
+
+; Ventilator outputs
+Numeric Output VentilatorAanzuig              ; Aanzuigventilator snelheid 0-100%
+Numeric Output VentilatorAfvoer               ; Afvoerventilator snelheid 0-100%
+Numeric Output VentilatorAanzuigStatus        ; Status aanzuigventilator (1=Aan, 0=Uit)
+Numeric Output VentilatorAfvoerStatus         ; Status afvoerventilator (1=Aan, 0=Uit)
+
+; Damper outputs
+Numeric Output BuitenluchtDamper              ; Buitenlucht damper positie 0-100%
+Numeric Output TerugvoerluchtDamper           ; Terugvoerlucht damper positie 0-100%
+Numeric Output ByPassDamper                   ; By-pass damper positie 0-100%
+Numeric Output MengkamerDamper                ; Mengkamer damper positie 0-100%
+
+; Warmtepomp outputs
+Numeric Output WarmtepompModus                ; 0=Uit, 1=Verwarmen, 2=Koelen
+Numeric Output WarmtepompVermogen             ; Warmtepomp vermogen 0-100%
+Numeric Output WarmtepompCompressor           ; Compressor status (1=Aan, 0=Uit)
+Numeric Output WarmtepompReverserendeKlep     ; Reverserende klep (1=Verwarmen, 0=Koelen)
+
+; Bevochtiger output
+Numeric Output BevochtigerVermogen            ; Bevochtiger vermogen 0-100%
+Numeric Output BevochtigerStatus              ; Bevochtiger status (1=Aan, 0=Uit)
+
+; Alarm en status outputs
+Numeric Output FilterAlarmG4                  ; Filter G4 vervuild alarm (1=Alarm)
+Numeric Output FilterAlarmF7                  ; Filter F7 vervuild alarm (1=Alarm)
+Numeric Output VentilatorAlarm                ; Ventilator alarm (1=Alarm)
+Numeric Output WarmtepompAlarm                ; Warmtepomp alarm (1=Alarm)
+Numeric Output SysteemStatus                  ; 0=Uit, 1=Automatisch, 2=Handmatig, 3=Nacht, 99=Alarm
+String Output StatusBericht                   ; Status bericht voor display
+
+; ====================================================================================
+; 3. LOKALE VARIABELEN DECLARATIE
+; ====================================================================================
+
+; Temperatuur setpoints en bereiken
+Numeric ToevoerluchtSetpoint                  ; Setpoint temperatuur toevoerlucht (°C)
+Numeric VerwarmingsSetpoint                   ; Setpoint voor verwarming (°C)
+Numeric KoelingsSetpoint                      ; Setpoint voor koeling (°C)
+Numeric HystereseTemperatuur                  ; Hysterese voor temperatuurregeling (°C)
+Numeric MinimumToevoerluchtTemp               ; Minimum toevoerlucht temperatuur (°C)
+Numeric MaximumToevoerluchtTemp               ; Maximum toevoerlucht temperatuur (°C)
+
+; Vochtigheid setpoints
+Numeric VochtigheidSetpoint                   ; Setpoint luchtvochtigheid (%)
+Numeric VochtigheidHysterese                  ; Hysterese voor vochtigheidsregeling (%)
+Numeric MinimumVochtigheid                    ; Minimum toegestane luchtvochtigheid (%)
+Numeric MaximumVochtigheid                    ; Maximum toegestane luchtvochtigheid (%)
+
+; Drukverschil drempelwaarden
+Numeric FilterG4MaxDrukverschil               ; Maximum drukverschil filter G4 (Pa)
+Numeric FilterF7MaxDrukverschil               ; Maximum drukverschil filter F7 (Pa)
+
+; Ventilator parameters
+Numeric VentilatorBasisSnelheid               ; Basis snelheid ventilator (%)
+Numeric VentilatorMinimumSnelheid             ; Minimum snelheid ventilator (%)
+Numeric VentilatorMaximumSnelheid             ; Maximum snelheid ventilator (%)
+Numeric VentilatorRampSnelheid                ; Ramp snelheid (%/minuut)
+
+; Warmtepomp parameters
+Numeric WarmtepompMinimumVermogen             ; Minimum vermogen warmtepomp (%)
+Numeric WarmtepompMaximumVermogen             ; Maximum vermogen warmtepomp (%)
+Numeric WarmtepompDeadband                    ; Deadband voor warmtepomp regeling (°C)
+Numeric WarmtepompMinTijdAan                  ; Minimum tijd warmtepomp aan (minuten)
+Numeric WarmtepompMinTijdUit                  ; Minimum tijd warmtepomp uit (minuten)
+
+; Tijd variabelen
+Datetime WarmtepompAanTijd                    ; Tijd wanneer warmtepomp aan ging
+Datetime WarmtepompUitTijd                    ; Tijd wanneer warmtepomp uit ging
+Datetime VentilatorStartTijd                  ; Tijd wanneer ventilator startte
+Numeric OpstartVertraging                     ; Opstart vertraging in seconden
+
+; Mengkamer berekeningen
+Numeric MengkamerVerhouding                   ; Verhouding buitenlucht/terugvoerlucht (0-1)
+Numeric BerekendeMengkamerTemp                ; Berekende mengkamer temperatuur (°C)
+Numeric MinimaleBuitenlucht                   ; Minimale buitenlucht fractie (0-1)
+
+; Teller en status variabelen
+Numeric FoutTeller                            ; Teller voor fouten
+Numeric AlarmTeller                           ; Teller voor alarmen
+Numeric OpstartFase                           ; Fase in opstart sequentie (0-10)
+Numeric HuidigeModus                          ; Huidige bedieningsmodus
+
+; Arrays voor logging (optioneel)
+Numeric TemperatuurLog[24]                    ; Log laatste 24 uur temperatuur
+Numeric VochtigheidLog[24]                    ; Log laatste 24 uur vochtigheid
+Numeric EnergieLog[24]                        ; Log laatste 24 uur energie gebruik
+
+; ====================================================================================
+; 4. INITIALISATIE VARIABELEN
+; ====================================================================================
+
+; Temperatuur parameters initialiseren
+ToevoerluchtSetpoint = 21.0                   ; Standaard setpoint 21°C
+VerwarmingsSetpoint = 20.0                    ; Verwarmingssetpoint
+KoelingsSetpoint = 22.0                       ; Koelsetpoint
+HystereseTemperatuur = 0.5                    ; Hysterese van 0.5°C
+MinimumToevoerluchtTemp = 16.0                ; Minimum toevoerlucht 16°C
+MaximumToevoerluchtTemp = 26.0                ; Maximum toevoerlucht 26°C
+
+; Vochtigheid parameters
+VochtigheidSetpoint = 50.0                    ; Standaard setpoint 50% RV
+VochtigheidHysterese = 5.0                    ; Hysterese van 5%
+MinimumVochtigheid = 30.0                     ; Minimum 30% RV
+MaximumVochtigheid = 60.0                     ; Maximum 60% RV
+
+; Filter drempelwaarden
+FilterG4MaxDrukverschil = 250.0               ; Maximum 250 Pa voor G4 filter
+FilterF7MaxDrukverschil = 300.0               ; Maximum 300 Pa voor F7 filter
+
+; Ventilator parameters
+VentilatorBasisSnelheid = 50.0                ; Basis snelheid 50%
+VentilatorMinimumSnelheid = 20.0              ; Minimum 20%
+VentilatorMaximumSnelheid = 100.0             ; Maximum 100%
+VentilatorRampSnelheid = 5.0                  ; Ramp 5%/minuut
+
+; Warmtepomp parameters
+WarmtepompMinimumVermogen = 20.0              ; Minimum 20% vermogen
+WarmtepompMaximumVermogen = 100.0             ; Maximum 100% vermogen
+WarmtepompDeadband = 1.0                      ; Deadband 1°C
+WarmtepompMinTijdAan = 5.0                    ; Minimum 5 minuten aan
+WarmtepompMinTijdUit = 3.0                    ; Minimum 3 minuten uit
+
+; Mengkamer parameters
+MengkamerVerhouding = 0.3                     ; Standaard 30% buitenlucht
+MinimaleBuitenlucht = 0.15                    ; Minimum 15% buitenlucht (ventilatie)
+
+; Initiele status
+OpstartFase = 0
+HuidigeModus = 0
+FoutTeller = 0
+AlarmTeller = 0
+OpstartVertraging = 30                        ; 30 seconden opstart vertraging
+
+; ====================================================================================
+; 5. VEILIGHEIDS CONTROLES (ALTIJD EERST UITVOEREN!)
+; ====================================================================================
+
+Line VeiligheidsControle
+
+; Controleer noodstop - heeft ALTIJD voorrang
+If Noodstop = 1 then
+    ; Noodstop actief - alles uitschakelen
+    Set VentilatorAanzuig to 0
+    Set VentilatorAfvoer to 0
+    Set VentilatorAanzuigStatus to Off
+    Set VentilatorAfvoerStatus to Off
+    Set WarmtepompModus to 0
+    Set WarmtepompVermogen to 0
+    Set WarmtepompCompressor to Off
+    Set BevochtigerVermogen to 0
+    Set BevochtigerStatus to Off
+    Set SysteemStatus to 99                    ; Alarm status
+    Set StatusBericht to "NOODSTOP ACTIEF"
+    Goto EindeProgramma
+Endif
+
+; Controleer brandalarm
+If Brandalarm = 1 then
+    ; Brandalarm - sluit alle dampers en schakel warmtepomp uit
+    Set BuitenluchtDamper to 0
+    Set TerugvoerluchtDamper to 100
+    Set ByPassDamper to 0
+    Set WarmtepompModus to 0
+    Set WarmtepompVermogen to 0
+    Set SysteemStatus to 99
+    Set StatusBericht to "BRANDALARM"
+    ; Ventilatoren blijven aan voor rookafzuiging (afhankelijk van situatie)
+    Goto VentilatorControle
+Endif
+
+; Controleer ventilator beveiliging
+If VentilatorBeveiliging = 0 then
+    Set VentilatorAlarm to On
+    Set VentilatorAanzuig to 0
+    Set VentilatorAfvoer to 0
+    Set VentilatorAanzuigStatus to Off
+    Set VentilatorAfvoerStatus to Off
+    Set SysteemStatus to 99
+    Set StatusBericht to "VENTILATOR BEVEILIGING"
+    AlarmTeller = AlarmTeller + 1
+Else
+    Set VentilatorAlarm to Off
+Endif
+
+; Controleer warmtepomp beveiliging
+If WarmtepompBeveiliging = 0 then
+    Set WarmtepompAlarm to On
+    Set WarmtepompModus to 0
+    Set WarmtepompVermogen to 0
+    Set WarmtepompCompressor to Off
+    Set SysteemStatus to 99
+    Set StatusBericht to "WARMTEPOMP BEVEILIGING"
+    AlarmTeller = AlarmTeller + 1
+Else
+    Set WarmtepompAlarm to Off
+Endif
+
+; Controleer filter status
+If FilterDrukverschilG4 > FilterG4MaxDrukverschil then
+    Set FilterAlarmG4 to On
+    Set StatusBericht to "FILTER G4 VERVUILD"
+Else
+    Set FilterAlarmG4 to Off
+Endif
+
+If FilterDrukverschilF7 > FilterF7MaxDrukverschil then
+    Set FilterAlarmF7 to On
+    If StatusBericht <> "NOODSTOP ACTIEF" and StatusBericht <> "BRANDALARM" then
+        Set StatusBericht to "FILTER F7 VERVUILD"
+    Endif
+Else
+    Set FilterAlarmF7 to Off
+Endif
+
+; Als er alarms zijn, ga naar alarm handling
+If AlarmTeller > 0 then
+    Goto AlarmHandling
+Endif
+
+; ====================================================================================
+; 6. BEDIENINGSMODUS SELECTIE
+; ====================================================================================
+
+Line ModusSelectie
+
+; Bepaal huidige modus
+HuidigeModus = BedieningsModus
+Set SysteemStatus to HuidigeModus
+
+; Selecteer op basis van modus
+Select Case HuidigeModus
+    Case 0
+        ; MODUS 0: UIT - Alles uitschakelen behalve monitoring
+        Set StatusBericht to "SYSTEEM UIT"
+        Goto ModusUit
+        
+    Case 1
+        ; MODUS 1: AUTOMATISCH - Volledige automatische regeling
+        Set StatusBericht to "AUTOMATISCHE REGELING"
+        Goto ModusAutomatisch
+        
+    Case 2
+        ; MODUS 2: HANDMATIG - Handmatige bediening
+        Set StatusBericht to "HANDMATIGE BEDIENING"
+        Goto ModusHandmatig
+        
+    Case 3
+        ; MODUS 3: NACHTMODUS - Gereduceerde regeling
+        Set StatusBericht to "NACHTMODUS"
+        Goto ModusNacht
+        
+    Case Else
+        ; Onbekende modus - default naar uit
+        Set StatusBericht to "ONBEKENDE MODUS"
+        Goto ModusUit
+EndSelect
+
+; ====================================================================================
+; 7. MODUS UIT
+; ====================================================================================
+
+Line ModusUit
+
+; Alles uitschakelen maar monitoring blijft actief
+Set VentilatorAanzuig to 0
+Set VentilatorAfvoer to 0
+Set VentilatorAanzuigStatus to Off
+Set VentilatorAfvoerStatus to Off
+Set WarmtepompModus to 0
+Set WarmtepompVermogen to 0
+Set WarmtepompCompressor to Off
+Set BevochtigerVermogen to 0
+Set BevochtigerStatus to Off
+
+; Dampers in gesloten positie
+Set BuitenluchtDamper to 0
+Set TerugvoerluchtDamper to 100
+Set ByPassDamper to 0
+
+Goto EindeProgramma
+
+; ====================================================================================
+; 8. MODUS AUTOMATISCH - VOLLEDIGE REGELING
+; ====================================================================================
+
+Line ModusAutomatisch
+
+; ====================================================================================
+; 8.1 Opstart sequentie
+; ====================================================================================
+
+; Controleer of systeem net is gestart
+If OpstartFase < 10 then
+    ; Opstart sequentie uitvoeren
+    OpstartFase = OpstartFase + 1
+    
+    Select Case OpstartFase
+        Case 1
+            ; Fase 1: Dampers openen
+            Set BuitenluchtDamper to (MinimaleBuitenlucht * 100)
+            Set TerugvoerluchtDamper to ((1 - MinimaleBuitenlucht) * 100)
+            Set ByPassDamper to 0
+            Set StatusBericht to "OPSTARTEN: DAMPERS OPENEN"
+            
+        Case 2, 3, 4, 5, 6
+            ; Fase 2-6: Ventilator opstarten met ramp
+            Numeric RampPercentage
+            RampPercentage = ((OpstartFase - 1) * 20)
+            
+            If RampPercentage <= VentilatorBasisSnelheid then
+                Set VentilatorAanzuig to RampPercentage
+                Set VentilatorAfvoer to RampPercentage
+                Set VentilatorAanzuigStatus to On
+                Set VentilatorAfvoerStatus to On
+                Set StatusBericht to "OPSTARTEN: VENTILATOR RAMP"
+            Endif
+            
+        Case 7, 8, 9
+            ; Fase 7-9: Wacht op stabilisatie
+            Set StatusBericht to "OPSTARTEN: STABILISEREN"
+            
+        Case 10
+            ; Fase 10: Opstarten voltooid
+            OpstartFase = 10
+            VentilatorStartTijd = Date
+            Set StatusBericht to "AUTOMATISCHE REGELING"
+    EndSelect
+    
+    ; Tijd controle voor opstart sequentie
+    If TS < OpstartVertraging then
+        Goto EindeProgramma                      ; Wacht tot vertraging voorbij is
+    Endif
+Else
+    ; Opstarten voltooid, continue met normale regeling
+    Goto AutomatischeRegeling
+Endif
+
+Goto EindeProgramma
+
+; ====================================================================================
+; 8.2 Automatische regeling - Ventilator snelheid bepaling
+; ====================================================================================
+
+Line AutomatischeRegeling
+
+; Bepaal ventilator snelheid op basis van bezetting en temperatuur
+Numeric GerekenndeVentilatorSnelheid
+GerekenndeVentilatorSnelheid = VentilatorBasisSnelheid
+
+; Verhoog snelheid bij bezetting
+If Bezetting = 1 then
+    GerekenndeVentilatorSnelheid = GerekenndeVentilatorSnelheid + 20
+Endif
+
+; Verhoog snelheid bij hoge temperatuur afwijking
+Numeric TemperatuurAfwijking
+TemperatuurAfwijking = ABS(ToevoerluchtTemperatuur - ToevoerluchtSetpoint)
+
+If TemperatuurAfwijking > 2.0 then
+    GerekenndeVentilatorSnelheid = GerekenndeVentilatorSnelheid + (TemperatuurAfwijking * 5)
+Endif
+
+; Beperk tot minimum en maximum
+If GerekenndeVentilatorSnelheid < VentilatorMinimumSnelheid then
+    GerekenndeVentilatorSnelheid = VentilatorMinimumSnelheid
+Endif
+
+If GerekenndeVentilatorSnelheid > VentilatorMaximumSnelheid then
+    GerekenndeVentilatorSnelheid = VentilatorMaximumSnelheid
+Endif
+
+; Pas ventilator snelheid aan met ramp
+Numeric HuidigeSnelheid
+HuidigeSnelheid = VentilatorAanzuig
+
+If HuidigeSnelheid < GerekenndeVentilatorSnelheid then
+    ; Verhoog snelheid
+    HuidigeSnelheid = HuidigeSnelheid + VentilatorRampSnelheid
+    If HuidigeSnelheid > GerekenndeVentilatorSnelheid then
+        HuidigeSnelheid = GerekenndeVentilatorSnelheid
+    Endif
+Else
+    If HuidigeSnelheid > GerekenndeVentilatorSnelheid then
+        ; Verlaag snelheid
+        HuidigeSnelheid = HuidigeSnelheid - VentilatorRampSnelheid
+        If HuidigeSnelheid < GerekenndeVentilatorSnelheid then
+            HuidigeSnelheid = GerekenndeVentilatorSnelheid
+        Endif
+    Endif
+Endif
+
+Set VentilatorAanzuig to HuidigeSnelheid
+Set VentilatorAfvoer to HuidigeSnelheid
+
+If HuidigeSnelheid > 0 then
+    Set VentilatorAanzuigStatus to On
+    Set VentilatorAfvoerStatus to On
+Else
+    Set VentilatorAanzuigStatus to Off
+    Set VentilatorAfvoerStatus to Off
+Endif
+
+; ====================================================================================
+; 8.3 Automatische regeling - Mengkamer berekening
+; ====================================================================================
+
+; Bereken optimale mengkamer verhouding op basis van temperaturen
+Numeric GewensteMengkamerTemp
+GewensteMengkamerTemp = ToevoerluchtSetpoint
+
+; Bepaal of buitenlucht nuttig is (free cooling/heating)
+Numeric BuitenluchtNuttig
+BuitenluchtNuttig = 0
+
+; Free cooling mogelijk als buitenlucht kouder is dan setpoint in koelmodus
+If BuitenluchtTemperatuur < (KoelingsSetpoint - 2.0) then
+    BuitenluchtNuttig = 1
+Endif
+
+; Free heating mogelijk als buitenlucht warmer is dan setpoint in verwarmmodus
+If BuitenluchtTemperatuur > (VerwarmingsSetpoint + 2.0) then
+    BuitenluchtNuttig = 1
+Endif
+
+; Bereken mengkamer verhouding
+If BuitenluchtNuttig = 1 then
+    ; Maximaliseer buitenlucht gebruik (energiebesparing)
+    MengkamerVerhouding = 0.8                 ; 80% buitenlucht
+Else
+    ; Minimale buitenlucht voor ventilatie
+    MengkamerVerhouding = MinimaleBuitenlucht ; 15% buitenlucht
+Endif
+
+; Beperk tot fysieke limieten
+If MengkamerVerhouding < MinimaleBuitenlucht then
+    MengkamerVerhouding = MinimaleBuitenlucht
+Endif
+
+If MengkamerVerhouding > 0.9 then
+    MengkamerVerhouding = 0.9                 ; Maximum 90% buitenlucht
+Endif
+
+; Stel dampers in
+Set BuitenluchtDamper to (MengkamerVerhouding * 100)
+Set TerugvoerluchtDamper to ((1 - MengkamerVerhouding) * 100)
+
+; Bereken verwachte mengkamer temperatuur
+BerekendeMengkamerTemp = (BuitenluchtTemperatuur * MengkamerVerhouding) + (TerugvoerluchtTemperatuur * (1 - MengkamerVerhouding))
+
+; ====================================================================================
+; 8.4 Automatische regeling - Warmtepomp besturing
+; ====================================================================================
+
+; Controleer minimum tijd restricties
+Numeric WarmtepompKanAan
+Numeric WarmtepompKanUit
+WarmtepompKanAan = 0
+WarmtepompKanUit = 0
+
+; Als warmtepomp uit is, controleer minimum uit tijd
+If WarmtepompCompressor = Off then
+    If WarmtepompUitTijd = 0 then
+        WarmtepompUitTijd = Date
+        WarmtepompKanUit = 1
+    Else
+        Numeric TijdUit
+        TijdUit = Difftime(MINUTE, WarmtepompUitTijd, Date)
+        If TijdUit >= WarmtepompMinTijdUit then
+            WarmtepompKanAan = 1
+        Endif
+    Endif
+Else
+    ; Warmtepomp is aan, controleer minimum aan tijd
+    If WarmtepompAanTijd = 0 then
+        WarmtepompAanTijd = Date
+        WarmtepompKanAan = 1
+    Else
+        Numeric TijdAan
+        TijdAan = Difftime(MINUTE, WarmtepompAanTijd, Date)
+        If TijdAan >= WarmtepompMinTijdAan then
+            WarmtepompKanUit = 1
+        Endif
+    Endif
+Endif
+
+; Bepaal of verwarming of koeling nodig is
+Numeric TemperatuurVerschil
+TemperatuurVerschil = BerekendeMengkamerTemp - ToevoerluchtSetpoint
+
+; Verwarming nodig
+If TemperatuurVerschil < (-HystereseTemperatuur) and WarmtepompKanAan = 1 then
+    ; Verwarming nodig - zet warmtepomp in verwarmingsmodus
+    Set WarmtepompModus to 1
+    Set WarmtepompReverserendeKlep to 1
+    
+    ; Bereken vermogen op basis van temperatuurverschil
+    Numeric VereistVermogen
+    VereistVermogen = ABS(TemperatuurVerschil) * 10
+    
+    If VereistVermogen < WarmtepompMinimumVermogen then
+        VereistVermogen = WarmtepompMinimumVermogen
+    Endif
+    
+    If VereistVermogen > WarmtepompMaximumVermogen then
+        VereistVermogen = WarmtepompMaximumVermogen
+    Endif
+    
+    Set WarmtepompVermogen to VereistVermogen
+    Set WarmtepompCompressor to On
+    
+    If WarmtepompAanTijd = 0 then
+        WarmtepompAanTijd = Date
+    Endif
+    WarmtepompUitTijd = 0
+Endif
+
+; Koeling nodig
+If TemperatuurVerschil > HystereseTemperatuur and WarmtepompKanAan = 1 then
+    ; Koeling nodig - zet warmtepomp in koelmodus
+    Set WarmtepompModus to 2
+    Set WarmtepompReverserendeKlep to 0
+    
+    ; Bereken vermogen
+    Numeric VereistVermogen
+    VereistVermogen = TemperatuurVerschil * 10
+    
+    If VereistVermogen < WarmtepompMinimumVermogen then
+        VereistVermogen = WarmtepompMinimumVermogen
+    Endif
+    
+    If VereistVermogen > WarmtepompMaximumVermogen then
+        VereistVermogen = WarmtepompMaximumVermogen
+    Endif
+    
+    Set WarmtepompVermogen to VereistVermogen
+    Set WarmtepompCompressor to On
+    
+    If WarmtepompAanTijd = 0 then
+        WarmtepompAanTijd = Date
+    Endif
+    WarmtepompUitTijd = 0
+Endif
+
+; Geen verwarming of koeling nodig
+If (TemperatuurVerschil >= (-WarmtepompDeadband)) and (TemperatuurVerschil <= WarmtepompDeadband) and WarmtepompKanUit = 1 then
+    ; Binnen deadband - warmtepomp uitschakelen
+    Set WarmtepompModus to 0
+    Set WarmtepompVermogen to 0
+    Set WarmtepompCompressor to Off
+    
+    WarmtepompAanTijd = 0
+    If WarmtepompUitTijd = 0 then
+        WarmtepompUitTijd = Date
+    Endif
+Endif
+
+; ====================================================================================
+; 8.5 Automatische regeling - Bevochtiger besturing
+; ====================================================================================
+
+; Controleer of bevochtiger is toegestaan
+If VrijgaveBevochtiger = 1 then
+    ; Controleer vochtigheid
+    Numeric VochtigheidAfwijking
+    VochtigheidAfwijking = VochtigheidSetpoint - ToevoerluchtVochtigheid
+    
+    ; Bevochtiging nodig
+    If VochtigheidAfwijking > VochtigheidHysterese then
+        ; Bereken vereist vermogen
+        Numeric VereistBevochtigerVermogen
+        VereistBevochtigerVermogen = VochtigheidAfwijking * 2
+        
+        If VereistBevochtigerVermogen < 10 then
+            VereistBevochtigerVermogen = 10
+        Endif
+        
+        If VereistBevochtigerVermogen > 100 then
+            VereistBevochtigerVermogen = 100
+        Endif
+        
+        Set BevochtigerVermogen to VereistBevochtigerVermogen
+        Set BevochtigerStatus to On
+    Else
+        If VochtigheidAfwijking < (-VochtigheidHysterese) then
+            ; Vochtigheid te hoog - bevochtiger uitschakelen
+            Set BevochtigerVermogen to 0
+            Set BevochtigerStatus to Off
+        Else
+            ; Binnen hysterese - huidige stand behouden
+            ; (geen wijziging)
+        Endif
+    Endif
+Else
+    ; Bevochtiger niet toegestaan
+    Set BevochtigerVermogen to 0
+    Set BevochtigerStatus to Off
+Endif
+
+; ====================================================================================
+; 9. MODUS HANDMATIG
+; ====================================================================================
+
+Line ModusHandmatig
+
+; Gebruik handmatige instellingen
+Set VentilatorAanzuig to HandmatigeVentilatorSnelheid
+Set VentilatorAfvoer to HandmatigeVentilatorSnelheid
+
+If HandmatigeVentilatorSnelheid > 0 then
+    Set VentilatorAanzuigStatus to On
+    Set VentilatorAfvoerStatus to On
+Else
+    Set VentilatorAanzuigStatus to Off
+    Set VentilatorAfvoerStatus to Off
+Endif
+
+; Handmatige warmtepomp instellingen
+Set WarmtepompModus to HandmatigeWarmtepompModus
+Set WarmtepompVermogen to 100                  ; Maximum vermogen in handmatige modus
+
+If HandmatigeWarmtepompModus = 1 then
+    ; Verwarmen
+    Set WarmtepompReverserendeKlep to 1
+    Set WarmtepompCompressor to On
+Endif
+
+If HandmatigeWarmtepompModus = 2 then
+    ; Koelen
+    Set WarmtepompReverserendeKlep to 0
+    Set WarmtepompCompressor to On
+Endif
+
+If HandmatigeWarmtepompModus = 0 then
+    ; Uit
+    Set WarmtepompCompressor to Off
+Endif
+
+; Dampers op 50/50 voor handmatige modus
+Set BuitenluchtDamper to 50
+Set TerugvoerluchtDamper to 50
+Set ByPassDamper to 0
+
+Goto EindeProgramma
+
+; ====================================================================================
+; 10. MODUS NACHT
+; ====================================================================================
+
+Line ModusNacht
+
+; Gereduceerde regeling voor nachtmodus
+Numeric NachtVentilatorSnelheid
+NachtVentilatorSnelheid = VentilatorMinimumSnelheid
+
+Set VentilatorAanzuig to NachtVentilatorSnelheid
+Set VentilatorAfvoer to NachtVentilatorSnelheid
+
+If NachtVentilatorSnelheid > 0 then
+    Set VentilatorAanzuigStatus to On
+    Set VentilatorAfvoerStatus to On
+Else
+    Set VentilatorAanzuigStatus to Off
+    Set VentilatorAfvoerStatus to Off
+Endif
+
+; Minimale buitenlucht voor nachtventilatie
+Set BuitenluchtDamper to (MinimaleBuitenlucht * 100)
+Set TerugvoerluchtDamper to ((1 - MinimaleBuitenlucht) * 100)
+
+; Warmtepomp alleen als temperatuur buiten acceptabel bereik
+If ToevoerluchtTemperatuur < MinimumToevoerluchtTemp then
+    ; Te koud - minimale verwarming
+    Set WarmtepompModus to 1
+    Set WarmtepompVermogen to WarmtepompMinimumVermogen
+    Set WarmtepompReverserendeKlep to 1
+    Set WarmtepompCompressor to On
+Else
+    If ToevoerluchtTemperatuur > MaximumToevoerluchtTemp then
+        ; Te warm - minimale koeling
+        Set WarmtepompModus to 2
+        Set WarmtepompVermogen to WarmtepompMinimumVermogen
+        Set WarmtepompReverserendeKlep to 0
+        Set WarmtepompCompressor to On
+    Else
+        ; Binnen acceptabel bereik - warmtepomp uit
+        Set WarmtepompModus to 0
+        Set WarmtepompVermogen to 0
+        Set WarmtepompCompressor to Off
+    Endif
+Endif
+
+; Bevochtiger uit in nachtmodus
+Set BevochtigerVermogen to 0
+Set BevochtigerStatus to Off
+
+Goto EindeProgramma
+
+; ====================================================================================
+; 11. ALARM HANDLING
+; ====================================================================================
+
+Line AlarmHandling
+
+; Verzamel alle alarmen
+String AlarmBericht
+AlarmBericht = "ALARMEN: "
+
+If FilterAlarmG4 = On then
+    AlarmBericht = AlarmBericht; "G4 "
+Endif
+
+If FilterAlarmF7 = On then
+    AlarmBericht = AlarmBericht; "F7 "
+Endif
+
+If VentilatorAlarm = On then
+    AlarmBericht = AlarmBericht; "VENT "
+Endif
+
+If WarmtepompAlarm = On then
+    AlarmBericht = AlarmBericht; "WP "
+Endif
+
+; Update status bericht
+Set StatusBericht to AlarmBericht
+
+; Reductie functionaliteit bij alarmen (niet volledig uitschakelen)
+; Behalve bij kritieke beveiligingen
+
+Goto EindeProgramma
+
+; ====================================================================================
+; 12. VENTILATOR CONTROLE (bij brandalarm)
+; ====================================================================================
+
+Line VentilatorControle
+
+; Bij brandalarm: rookafzuiging modus
+; Ventilatoren op maximum voor rookafzuiging
+Set VentilatorAanzuig to VentilatorMaximumSnelheid
+Set VentilatorAfvoer to VentilatorMaximumSnelheid
+Set VentilatorAanzuigStatus to On
+Set VentilatorAfvoerStatus to On
+
+Goto EindeProgramma
+
+; ====================================================================================
+; 13. EINDE PROGRAMMA
+; ====================================================================================
+
+Line EindeProgramma
+
+; Reset opstart fase na 1 uur (voor herstart mogelijkheid)
+If OpstartFase = 10 then
+    If VentilatorStartTijd > 0 then
+        Numeric UrenSindsStart
+        UrenSindsStart = Difftime(HOUR, VentilatorStartTijd, Date)
+        If UrenSindsStart > 1 then
+            ; Reset opstart fase na 1 uur
+            ; (Dit zorgt ervoor dat bij modus wijziging opnieuw opgestart kan worden)
+        Endif
+    Endif
+Endif
+
+; Reset tellers periodiek (voorkomt overflow)
+If TOD = 0 then
+    ; Om middernacht reset tellers
+    If AlarmTeller > 10 then
+        AlarmTeller = 0
+    Endif
+    If FoutTeller > 10 then
+        FoutTeller = 0
+    Endif
+Endif
+
+; Einde van programma - terug naar begin
+Goto VeiligheidsControle
+
+; ====================================================================================
+; EINDE SCRIPT
+; ====================================================================================
+
