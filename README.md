@@ -7,7 +7,23 @@ Dit repository bevat praktische voorbeelden en uitgebreide documentatie voor het
 ## 📁 Bestanden
 
 ### 📖 Documentatie
-- **[Script_Programming_Documentatie.md](Script_Programming_Documentatie.md)** - Complete documentatie met uitleg over:
+- **[Script_Editor_Reference_Guide.md](Script_Editor_Reference_Guide.md)** ⭐ **NIEUW!** - Complete referentie gids met:
+  - Alle Program Components (Constants, Operators, Statements, Expressions, Variables)
+  - Uitgebreide operator documentatie met precedence
+  - Alle Program Statements (Action, Declaration, Program Control)
+  - System Variables en System Functions
+  - Platform-specifieke informatie
+  - Quick Reference Card
+  - Volledige syntax documentatie van begin tot eind
+
+- **[Script_Editor_Syntax_Rules.txt](Script_Editor_Syntax_Rules.txt)** ⭐ **NIEUW!** - Syntax regels en validatie:
+  - Alle syntax regels voor statements
+  - Validatie checklists
+  - Veelvoorkomende fouten en oplossingen
+  - Platform-specifieke restricties
+  - Best practices checklist
+
+- **[Script_Programming_Documentatie.md](Script_Programming_Documentatie.md)** - Basis documentatie met uitleg over:
   - Basis structuur van Script Programming
   - Inputs, Outputs en Variabelen
   - Data types (BOOL, INT, REAL, STRING)
@@ -25,64 +41,77 @@ Dit repository bevat praktische voorbeelden en uitgebreide documentatie voor het
 
 ## 🚀 Quick Start
 
-### Basis Structuur
+### Basis Structuur (Schneider Electric Script Editor Syntax)
 
-```plaintext
-; 1. INPUT DECLARATIES
-IN TemperatuurSensor
-IN StartKnop
+```script
+; 1. VARIABELE DECLARATIES
+Numeric Input TemperatuurSensor
+Numeric Output Ventilator
+Numeric Drempelwaarde
 
-; 2. OUTPUT DECLARATIES
-OUT Ventilator
+; 2. INITIALISATIE
+Drempelwaarde = 25.0
 
-; 3. VARIABELEN
-VAR Drempelwaarde = 25.0
-
-; 4. PROGRAMMA LOGICA
-IF TemperatuurSensor > Drempelwaarde THEN
-    Ventilator = ON
-ELSE
-    Ventilator = OFF
-ENDIF
+; 3. PROGRAMMA LOGICA
+If TemperatuurSensor > Drempelwaarde then
+    Set Ventilator to On
+Else
+    Set Ventilator to Off
+Endif
 ```
 
 ### Belangrijkste Concepten
 
-- **`IN`** - Inputs (signalen die binnenkomen, zoals sensoren)
-- **`OUT`** - Outputs (signalen die je verstuurt, zoals actuatoren)
-- **`VAR`** - Variabelen (waarden die je opslaat)
-- **`IF-THEN-ELSE`** - Voorwaardelijke logica
-- **`= ON/OFF`** - Output aan/uit zetten
+- **`Numeric Input`** - Input variabelen (signalen die binnenkomen, zoals sensoren)
+- **`Numeric Output`** - Output variabelen (signalen die je verstuurt, zoals actuatoren)
+- **`Numeric` / `String` / `Datetime`** - Lokale variabelen (waarden die je opslaat)
+- **`If...Then...Else...Endif`** - Voorwaardelijke logica
+- **`Set ... to On/Off`** - Output aan/uit zetten
+
+**📚 Voor volledige syntax en alle mogelijkheden, zie [Script_Editor_Reference_Guide.md](Script_Editor_Reference_Guide.md)**
 
 ## 📋 Data Types
 
 | Type | Beschrijving | Voorbeeld |
 |------|--------------|-----------|
-| **BOOL** | Boolean (TRUE/FALSE, ON/OFF) | `VAR Status = TRUE` |
-| **INT** | Geheel getal | `VAR Teller = 100` |
-| **REAL** | Decimaal getal | `VAR Temperatuur = 25.5` |
-| **STRING** | Tekst | `VAR Status = "Actief"` |
+| **Numeric** | Floating-point nummer (IEEE 754 single precision) | `Numeric Temp = 25.5` |
+| **String** | Tekst string (default 16 karakters, max 1MB) | `String Status = "Actief"` |
+| **Datetime** | Datum en tijd | `Datetime StartTime = Date` |
+
+**Variable Types (in Variables Pane):**
+- **Float** - Floating-point (default voor Numeric)
+- **Int** - Integer (geheel getal)
+- **Bool** - Boolean (0/1, False/True)
+- **String** - Character string
+- **DateTime** - Date and time
 
 ## 🔧 Operatoren
 
 ### Rekenkundig
-- `+` Optellen
-- `-` Aftrekken
-- `*` Vermenigvuldigen
-- `/` Delen
+- `+` `PLUS` - Optellen
+- `-` `MINUS` - Aftrekken  
+- `*` `TIMES` - Vermenigvuldigen
+- `/` `DIVIDED BY` - Delen
+- `MOD` `REMAINDER` - Modulo (rest)
+- `^` `^^` `EXP` - Machtsverheffen
 
 ### Vergelijking
-- `=` Gelijk aan
-- `<>` Niet gelijk aan
-- `>` Groter dan
-- `<` Kleiner dan
-- `>=` Groter dan of gelijk aan
-- `<=` Kleiner dan of gelijk aan
+- `=` `EQUALS` `IS EQUAL TO` - Gelijk aan
+- `<>` `IS NOT EQUAL TO` - Niet gelijk aan
+- `>` `IS GREATER THAN` - Groter dan
+- `<` `IS LESS THAN` - Kleiner dan
+- `>=` `IS GREATER THAN OR EQUAL TO` - Groter dan of gelijk aan
+- `<=` `IS LESS THAN OR EQUAL TO` - Kleiner dan of gelijk aan
+- `IS IN` `IS EITHER` - In lijst
+- `IS NOT IN` `IS NEITHER` - Niet in lijst
+- `IS BETWEEN` `IS THRU` - In bereik
 
 ### Logisch
-- `AND` Logische EN
-- `OR` Logische OF
-- `NOT` Logische NIET
+- `AND` `&` - Logische EN
+- `OR` `!` - Logische OF
+- `NOT` - Logische NIET
+
+**📚 Zie [Script_Editor_Reference_Guide.md](Script_Editor_Reference_Guide.md) voor volledige operator precedence en alle aliases**
 
 ## 📝 Voorbeeld: Fan Control
 
@@ -130,7 +159,14 @@ Het `Fan_Control_Script.txt` bestand bevat een compleet voorbeeld met:
 
 ## 📅 Laatste Update
 
-**2025-12-30** - Eerste versie met voorbeelden en documentatie
+**2024-12-30** - Complete referentie gids en syntax rules toegevoegd:
+- ✅ Complete Script Editor Reference Guide met alle componenten
+- ✅ Syntax Rules en Validatie documentatie
+- ✅ Platform-specifieke informatie
+- ✅ Quick Reference Card
+- ✅ Best practices en veelvoorkomende fouten
+
+**2024-12-30** - Eerste versie met voorbeelden en basis documentatie
 
 ## 📄 Licentie
 
@@ -138,5 +174,13 @@ Deze voorbeelden zijn bedoeld voor educatieve doeleinden. Gebruik op eigen risic
 
 ---
 
-💡 **Tip:** Begin met `Eenvoudig_Voorbeeld.txt` en gebruik de documentatie als naslagwerk!
+💡 **Tips voor gebruik:**
+
+1. **Beginners:** Start met `Eenvoudig_Voorbeeld.txt` en `Script_Programming_Documentatie.md`
+2. **Geavanceerd:** Gebruik `Script_Editor_Reference_Guide.md` als complete referentie
+3. **Syntax Check:** Raadpleeg `Script_Editor_Syntax_Rules.txt` voor validatie regels
+4. **Quick Lookup:** Gebruik de Quick Reference Card in de Reference Guide
+
+📖 **Voor complete syntax van begin tot eind, zie [Script_Editor_Reference_Guide.md](Script_Editor_Reference_Guide.md)**
+
 

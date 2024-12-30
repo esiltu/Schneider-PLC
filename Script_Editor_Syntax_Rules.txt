@@ -1,0 +1,628 @@
+# Schneider Electric Script Editor - Syntax Rules en Validatie Regels
+
+## Basis Syntax Regels
+
+### 1. STATEMENT STRUCTUUR
+
+#### IF-THEN-ELSE
+- IF en THEN moeten op dezelfde fysieke regel staan
+- ELSE moet op eigen regel staan (bij multi-line format)
+- Elke IF moet een corresponderende ENDIF hebben
+- ENDIF sluit de IF-THEN-ELSE block
+
+VALIDE:
+  If condition then statement
+  If condition then
+      statements
+  Endif
+  If condition then statement else statement
+  If condition then
+      statements
+  Else
+      statements
+  Endif
+
+ONVALIDE:
+  If condition
+      then statement          ; IF en THEN op verschillende regels
+  If condition then
+      statements              ; Geen ENDIF
+
+#### FOR-NEXT
+- FOR en NEXT moeten dezelfde variabele naam gebruiken
+- NEXT moet de variabele naam bevatten
+
+VALIDE:
+  For count = 1 to 10
+      statements
+  Next count
+
+ONVALIDE:
+  For count = 1 to 10
+      statements
+  Next i                     ; Verkeerde variabele naam
+
+#### WHILE
+- Moet eindigen met ENDWHILE
+
+VALIDE:
+  While condition
+      statements
+  Endwhile
+
+#### REPEAT-UNTIL
+- REPEAT opent, UNTIL sluit
+
+VALIDE:
+  Repeat
+      statements
+  Until condition
+
+#### SELECT-CASE
+- Moet eindigen met ENDSELECT
+- CASE ELSE is optioneel maar aanbevolen
+
+VALIDE:
+  Select Case expression
+      Case value
+          statements
+      Case Else
+          statements
+  EndSelect
+
+---
+
+### 2. VARIABELE DECLARATIE
+
+#### NUMERIC
+- Type moet voorafgaan aan naam
+- Optionele qualifiers: Input, Output, Public
+- Arrays: [size] na naam
+
+VALIDE:
+  Numeric VariableName
+  Numeric Input InputVar
+  Numeric Output OutputVar
+  Numeric Public PublicVar
+  Numeric ArrayVar[10]
+  Numeric Input InputArray[5]
+
+ONVALIDE:
+  VariableName Numeric        ; Verkeerde volgorde
+  Numeric ArrayVar[]          ; Geen size opgegeven
+  Numeric Input[5] Var        ; Input op verkeerde positie
+
+#### STRING
+- Optionele lengte tussen String en naam
+- Default lengte: 16 karakters
+
+VALIDE:
+  String VarName              ; Default 16 karakters
+  String 20 LongVar           ; 20 karakters
+  String 8 ArrayVar[10]       ; Array van 10 strings van 8 karakters
+
+#### DATETIME
+- Zelfde structuur als NUMERIC
+
+VALIDE:
+  Datetime VarName
+  Datetime Input InputDT
+  Datetime ArrayDT[5]
+
+#### FUNCTION
+- Declareer voor gebruik
+- Moet bound worden aan Script Function object
+
+VALIDE:
+  Function MyFunction
+  Result = MyFunction(Arg1, Arg2)
+
+#### WEBSERVICE
+- Alleen in automation server Script programma's
+
+VALIDE:
+  Webservice ServiceName
+
+---
+
+### 3. OPERATOR PRECEDENCE (volgorde)
+
+Van hoogste naar laagste:
+1. () [] - Parentheses, Array Element
+2. \ of spatie - Path Name Connector
+3. + - NOT BITNOT % - Unary operators
+4. ^^ - Exponentiation
+5. * / MOD - Vermenigvuldigen, Delen, Modulo
+6. + - - Optellen, Aftrekken
+7. < <= > >= - Vergelijkingen
+8. = <> IS IN IS NOT IN IS BETWEEN IS THRU - Gelijkheidsoperators
+9. BITAND BITOR BITXOR - Bit operators
+10. & ! - Logische AND/OR
+11. ; - String joining
+
+Gebruik parentheses voor expliciete volgorde:
+VALIDE:
+  Result = (A + B) * C
+  If (A > B) and (C < D) then
+
+ONVALIDE (mogelijk onverwacht resultaat):
+  Result = A + B * C          ; Wordt A + (B * C)
+  If A > B and C < D then     ; Onduidelijke precedence
+
+---
+
+### 4. NUMERIEKE CONSTANTEN
+
+VALIDE:
+  12                          ; Integer (wordt float behandeld)
+  74.5                        ; Decimal
+  -.543                       ; Negatief decimal
+  4E+32                       ; Wetenschappelijke notatie
+  1.40129E-45                 ; Minimum positief
+  3.402823E+38                ; Maximum positief
+
+ONVALIDE:
+  1,000                       ; Komma niet toegestaan
+  3.402824E+38                ; Te groot (wordt infinity)
+  -3.402824E+38               ; Te klein (wordt -infinity)
+
+---
+
+### 5. STRING CONSTANTEN
+
+VALIDE:
+  "Hello world"               ; Eenvoudige string
+  "The string |" abc|" included"  ; Met aanhalingsteken
+  "|7"                        ; Met ASCII code (beep)
+
+ONVALIDE:
+  Hello world                 ; Geen quotes
+  "Unclosed string            ; Geen sluitende quote
+
+---
+
+### 6. LINE LABELS
+
+VALIDE:
+  Line Startup
+  Startup:
+  Line 1
+  1:
+
+ONVALIDE:
+  Line 0                      ; Gereserveerd (stopt programma)
+  Line C                      ; Gereserveerd
+  Line E                      ; Toegestaan, maar speciaal (error handler)
+
+RESERVED:
+  LINE 0 - Stoppen programma (gebruik: GOTO line 0)
+  LINE C - Gereserveerd voor toekomst
+  LINE E - Error handler (automatisch uitgevoerd bij errors)
+
+---
+
+### 7. ARG DECLARATIE (in functies)
+
+VALIDE:
+  ARG 1 Radius                ; Declareer argument 1
+  ARG[5]                      ; Gebruik argument 5
+  ARG Count                   ; Onvalide (moet nummer zijn)
+
+ONVALIDE:
+  ARG Radius                  ; Geen nummer
+  ARG[1.5]                    ; Geen integer
+  ARG 16                      ; Maximum is 15
+
+LIMIET: Maximum 15 argumenten (ARG 1 tot ARG 15)
+
+---
+
+### 8. ARRAY GEBRUIK
+
+VALIDE:
+  Numeric Array[10]
+  Array[1] = 5                ; Eerste element (index begint bij 1)
+  Array[10] = 20              ; Laatste element
+  Index = 5
+  Array[Index] = 15           ; Variabele index
+
+ONVALIDE:
+  Array[0] = 5                ; Index begint bij 1, niet 0
+  Array[11] = 20              ; Out of bounds (array heeft 10 elementen)
+
+LIMIET: Maximum array size: 32,767 elementen
+
+---
+
+### 9. GOTO GEBRUIK
+
+VALIDE:
+  Goto Startup
+  Goto Line Startup
+  Go Startup
+  Go To Startup
+  Go To Line Startup
+
+REQUIREMENT: Line label moet bestaan in hetzelfde programma
+
+---
+
+### 10. SET STATEMENT
+
+VALIDE:
+  Set Variable to Value
+  Set Variable = Value
+  Variable = Value            ; Zonder SET
+  Adjust Variable to Value    ; Alias van SET
+  Change Variable to Value    ; Alias van SET (alleen met TO)
+  Modify Variable to Value    ; Alias van SET
+  Let Variable = Value        ; Alias van SET (alleen met =)
+
+ONVALIDE:
+  Adjust Variable = Value     ; ADJUST vereist TO
+  Change Variable = Value     ; CHANGE vereist TO
+  Let Variable to Value       ; LET vereist =
+
+---
+
+### 11. PRINT FORMATTING
+
+VALIDE:
+  Print "Text"
+  Print Variable
+  Print "Format |###", Variable
+  Print "Text |" quoted|""    ; Met aanhalingsteken
+  Print "|7"                  ; ASCII code 7 (beep)
+  Print Var1; Var2            ; Zonder nieuwe regel (semicolon)
+
+FORMAT KARAKTERS:
+  |"      - Print aanhalingsteken
+  |#      - Numeriek karakter (rechts uitgelijnd)
+  |$###   - ON/-ON/OFF voor tristate
+  |%###   - Percentage
+  |*      - Elke lengte string
+  |@      - Alphanumeriek karakter (links uitgelijnd)
+  |,      - Duizendtallen scheiding
+  |}      - Verwijder trailing zeros
+  |>      - Rechts uitlijnen
+  |<      - Links uitlijnen
+  |-      - Leading/trailing min/plus
+  |^^     - Wetenschappelijke notatie
+
+---
+
+### 12. FUNCTION CALLS
+
+VALIDE:
+  Result = FunctionName()
+  Result = FunctionName(Arg1)
+  Result = FunctionName(Arg1, Arg2)
+  FunctionName()              ; Zonder return waarde
+
+REQUIREMENT: Function moet gedeclareerd zijn: Function FunctionName
+
+---
+
+### 13. SYSTEM VARIABELEN
+
+READ-ONLY (kunnen niet worden gezet):
+  DATE, DAYOFMONTH, DAYOFYEAR, HOD, HOUR, MINUTE, MONTH, SECOND, TOD, WEEKDAY, YEAR, UTCOffset, DST
+  ERRORS, FREEMEM, SCAN
+  TS, TM, TH, TD (runtime variables)
+
+VALIDE:
+  CurrentTime = Date
+  If Hour = 5 then...
+  If Errors > 10 then...
+
+ONVALIDE:
+  Date = "2024-01-01"         ; DATE is read-only
+  Hour = 12                   ; HOUR is read-only
+
+---
+
+### 14. INPUT/OUTPUT/PUBLIC VARIABELEN
+
+INPUT:
+  - Read-only in programma (kunnen niet worden gezet)
+  - Nemen waarde over van bound object property
+
+VALIDE:
+  Numeric Input TempIn
+  Temperature = TempIn        ; Lezen
+
+ONVALIDE:
+  Numeric Input TempIn
+  TempIn = 25                 ; Input kan niet worden gezet
+
+OUTPUT:
+  - Kunnen worden gezet
+  - Zetten bound object property
+
+VALIDE:
+  Numeric Output TempOut
+  TempOut = 72                ; Zetten
+
+PUBLIC:
+  - Zelfde als OUTPUT, maar kan worden aangepast van buiten programma
+  - Behoudt waarde na power failure/reboot
+
+VALIDE:
+  Numeric Public Setting
+  Setting = 100               ; Zetten (vanuit programma of extern)
+
+BELANGRIJK: Nieuwe PUBLIC variabelen moeten NA bestaande PUBLIC keywords worden geplaatst
+
+VALIDE:
+  Numeric Public OldVar
+  Numeric Public NewVar       ; Nieuwe na bestaande
+
+ONVALIDE (verliest waarde na save):
+  Numeric Public NewVar
+  Numeric Public OldVar       ; Nieuwe voor bestaande
+
+---
+
+### 15. BIT OPERATORS
+
+VALIDE:
+  Result = Value1 bitand Value2
+  Result = Value1 bitor Value2
+  Result = Value1 bitxor Value2
+  Result = bitnot Value
+
+REQUIREMENT: Werken alleen met integers 0-65535 (decimalen worden afgekapt)
+
+ONVALIDE:
+  Result = 13.5 bitand 11     ; 13.5 wordt 13 (afgekapt)
+
+RESTRICTIE: Niet geldig voor Infinet device Script programma's
+
+---
+
+### 16. STRING OPERATIONS
+
+CONCATENATIE:
+VALIDE:
+  Result = String1; String2
+  Print "First"; " "; "Second"
+
+LENGTE:
+VALIDE:
+  String 20 LongString        ; 20 karakters
+  String DefaultString        ; 16 karakters (default)
+
+LIMIETEN:
+  - Default: 16 karakters
+  - Maximum (EcoStruxure BMS servers): 1,048,576 karakters (1 MB)
+  - Maximum (b3 BACnet devices): 32 karakters
+
+---
+
+### 17. DATETIME OPERATIONS
+
+VALIDE:
+  Datetime VarName
+  VarName = Date              ; Huidige datum/tijd
+  VarName = StrToDate("SEPTEMBER-21-2010 11:00 pm")
+  Result = Difftime(SECOND, Date1, Date2)
+
+FORMAT: MONTH DD YYYY hh:mm:ss (bij PRINT)
+
+---
+
+### 18. COMPARISON OPERATORS
+
+VALIDE:
+  If Value < 10 then...
+  If Value <= 10 then...
+  If Value > 10 then...
+  If Value >= 10 then...
+  If Value = 10 then...
+  If Value <> 10 then...
+  If Value is in 1, 2, 3 then...
+  If Value is not in 1, 2, 3 then...
+  If Value is between 10 and 20 then...
+  If Value is 10 thru 20 then...
+
+STRING VERGELIJKINGEN:
+  - Strings worden vergeleken op ASCII codes
+  - "Z" > "A" (90 > 65)
+  - "9" > "0"
+  - "A" > "9"
+
+---
+
+### 19. LOGICAL OPERATORS
+
+VALIDE:
+  If Condition1 and Condition2 then...
+  If Condition1 & Condition2 then...     ; Ampersand alias
+  If Condition1 or Condition2 then...
+  If Condition1 ! Condition2 then...     ; Exclamation alias
+  If not Condition then...
+
+PRECEDENCE: OR wordt vóór AND uitgevoerd (gebruik parentheses)
+
+VALIDE:
+  If (A or B) and (C or D) then...
+
+ONVALIDE (mogelijk onverwacht):
+  If A or B and C or D then...           ; Onduidelijke precedence
+
+---
+
+### 20. WAIT/DELAY
+
+VALIDE:
+  Wait 5                      ; 5 seconden
+  Wait (3)                    ; 3 seconden
+  Delay 10                    ; 10 seconden (alias)
+
+RESTRICTIES:
+  - Alleen in automation server Script programma's
+  - NIET in MP/RP controllers
+  - NIET in Script functies
+  - NIET in Script event programma's
+  - NIET binnen For loops
+
+---
+
+### 21. PLATFORM SPECIFIEKE RESTRICTIES
+
+ECOSTRUXURE BMS SERVERS:
+  - Volledige functionaliteit
+  - WebService ondersteuning
+  - Buffered inputs
+  - WAIT keyword
+  - Dynamic arrays
+  - Event programs
+
+MP/RP CONTROLLERS:
+  - Script programma's en functies
+  - Event programs
+  - Lighting/Blind control keywords
+  - GEEN WebService
+  - GEEN WAIT in loops
+  - GEEN buffered inputs in functies/event programs
+
+B3 BACNET CONTROLLERS:
+  - Beperkte functionaliteit
+  - Max string lengte: 32 karakters
+  - GEEN buffered inputs
+  - GEEN WebService
+  - GEEN event programs
+
+INFINET CONTROLLERS:
+  - Gebruik ON/OFF voor digital outputs (niet Active/Inactive)
+  - GEEN bit operators
+  - Beperkte functies
+
+---
+
+### 22. COMMON ERRORS TE VERMIJDEN
+
+1. VERGETEN ENDIF:
+   ONVALIDE:
+     If condition then
+         statement
+   
+   VALIDE:
+     If condition then
+         statement
+     Endif
+
+2. VERKEERDE ARRAY INDEX:
+   ONVALIDE:
+     Array[0] = 5              ; Begint bij 1
+     Array[11] = 10            ; Out of bounds (voor array[10])
+   
+   VALIDE:
+     Array[1] = 5
+     If Index >= 1 and Index <= ArraySize then
+         Array[Index] = 10
+     Endif
+
+3. INPUT VARIABELE SETTEN:
+   ONVALIDE:
+     Numeric Input Temp
+     Temp = 25                 ; Input is read-only
+   
+   VALIDE:
+     Numeric Input Temp
+     Numeric TempValue
+     TempValue = Temp
+
+4. STRING VS NUMERIC:
+   ONVALIDE:
+     String Value = 123        ; Moet "123" zijn
+   
+   VALIDE:
+     String Value = "123"
+     Numeric Value = 123
+
+5. FUNCTION ZONDER DECLARATIE:
+   ONVALIDE:
+     Result = MyFunction()     ; Niet gedeclareerd
+   
+   VALIDE:
+     Function MyFunction
+     Result = MyFunction()
+
+6. ONJUISTE OPERATOR PRECEDENCE:
+   ONVALIDE:
+     Result = A + B * C        ; Mogelijk onverwacht
+   
+   VALIDE:
+     Result = A + (B * C)      ; Expliciet
+
+7. PUBLIC VARIABELEN VOLGORDE:
+   ONVALIDE:
+     Numeric Public NewVar
+     Numeric Public OldVar     ; Verliest waarde
+   
+   VALIDE:
+     Numeric Public OldVar
+     Numeric Public NewVar     ; Behoudt waarde
+
+---
+
+### 23. BEST PRACTICES CHECKLIST
+
+□ Alle variabelen gedeclareerd bovenaan programma
+□ Duidelijke, beschrijvende namen gebruikt
+□ Commentaar toegevoegd voor complexe logica
+□ Veiligheidscontroles eerst (emergency stops, etc.)
+□ Hysterese gebruikt voor stabiele werking (voorkomt flikkeren)
+□ Variabelen geïnitialiseerd met beginwaarden
+□ Parentheses gebruikt voor expliciete operator precedence
+□ Error handling met LINE E
+□ GOTO alleen voor loops of error handling
+□ Edge cases getest (extreme waarden, NULL, boundaries)
+□ Platform specifieke restricties gerespecteerd
+□ Public variabelen in juiste volgorde
+□ Arrays met juiste index bereik (1 tot size)
+□ Input variabelen niet gezet (alleen gelezen)
+□ Function calls met juiste aantal argumenten
+□ String constants met quotes
+□ Numeric constants zonder komma's
+□ Line labels uniek en duidelijk
+□ ENDIF voor elke IF
+□ NEXT variabele match met FOR variabele
+□ ENDWHILE voor WHILE
+□ ENDSELECT voor SELECT CASE
+
+---
+
+### 24. QUICK VALIDATIE CHECKLIST
+
+VOOR COMPILEREN:
+□ Syntax errors gecheckt (alle statements correct geformatteerd)
+□ Alle variabelen gedeclareerd
+□ Alle functies gedeclareerd
+□ Alle line labels bestaan voor GOTO statements
+□ Array indices binnen bereik
+□ Input variabelen niet gezet
+□ Operator precedence expliciet met parentheses waar nodig
+□ String constants met quotes
+□ Numeric constants zonder komma's
+□ IF statements hebben ENDIF
+□ FOR loops hebben NEXT met juiste variabele
+□ WHILE loops hebben ENDWHILE
+□ REPEAT-UNTIL loops correct afgesloten
+□ SELECT CASE heeft ENDSELECT
+□ Platform restricties gerespecteerd
+□ Public variabelen in juiste volgorde
+
+NA COMPILEREN:
+□ Geen compiler errors
+□ Geen compiler warnings
+□ Binding errors gecontroleerd
+□ Test scenarios voorbereid
+□ Error handling getest
+□ Edge cases getest
+
+---
+
+EINDE VAN SYNTAX RULES
+
