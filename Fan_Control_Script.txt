@@ -1,0 +1,74 @@
+; ============================================
+; SCHNEIDER ELECTRIC SCRIPT PROGRAMMING
+; Fan Control Script - Voorbeeld
+; ============================================
+
+; --- INPUT DECLARATIES ---
+; Inputs zijn signalen die het script binnenkomen (sensoren, schakelaars, etc.)
+IN TemperatuurSensor      ; Temperatuursensor input (bijv. 0-100 graden)
+IN HandmatigeSchakelaar   ; Handmatige aan/uit schakelaar (BOOL: TRUE/FALSE)
+IN StartKnop              ; Start knop (BOOL: TRUE/FALSE)
+IN StopKnop               ; Stop knop (BOOL: TRUE/FALSE)
+
+; --- OUTPUT DECLARATIES ---
+; Outputs zijn signalen die het script verstuurt (actuatoren, lampen, etc.)
+OUT Ventilator            ; Ventilator output (BOOL: ON/OFF)
+OUT StatusLamp           ; Status indicator lamp (BOOL: ON/OFF)
+OUT Alarm                ; Alarm output (BOOL: ON/OFF)
+
+; --- VARIABELEN ---
+; Variabelen voor logica en berekeningen
+VAR Drempelwaarde = 25.0          ; Temperatuur drempelwaarde (REAL)
+VAR Hysterese = 2.0               ; Hysterese om flikkeren te voorkomen (REAL)
+VAR VentilatorAan = FALSE         ; Interne status variabele (BOOL)
+VAR Temperatuur = 0.0             ; Huidige temperatuur waarde (REAL)
+
+; ============================================
+; HOOFDPROGRAMMA
+; ============================================
+
+; Lees de temperatuur sensor
+Temperatuur = TemperatuurSensor
+
+; --- Veiligheidscontrole: Stop knop heeft altijd voorrang ---
+IF StopKnop = TRUE THEN
+    VentilatorAan = FALSE
+    Ventilator = OFF
+    StatusLamp = OFF
+    Alarm = OFF
+    GOTO Einde
+ENDIF
+
+; --- Handmatige bediening ---
+IF HandmatigeSchakelaar = TRUE THEN
+    IF StartKnop = TRUE THEN
+        VentilatorAan = TRUE
+        Ventilator = ON
+        StatusLamp = ON
+    ENDIF
+    GOTO Einde
+ENDIF
+
+; --- Automatische temperatuurregeling met hysterese ---
+; Hysterese voorkomt dat de ventilator constant aan/uit gaat bij de drempelwaarde
+IF Temperatuur > (Drempelwaarde + Hysterese) THEN
+    VentilatorAan = TRUE
+    Ventilator = ON
+    StatusLamp = ON
+ELSEIF Temperatuur < (Drempelwaarde - Hysterese) THEN
+    VentilatorAan = FALSE
+    Ventilator = OFF
+    StatusLamp = OFF
+ENDIF
+
+; --- Alarm bij te hoge temperatuur ---
+IF Temperatuur > 35.0 THEN
+    Alarm = ON
+ELSE
+    Alarm = OFF
+ENDIF
+
+; --- Einde van het programma ---
+Einde:
+; Script eindigt hier
+

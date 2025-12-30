@@ -1,0 +1,40 @@
+; ============================================
+; EENVOUDIG VOORBEELD - Script Programming
+; Perfect voor beginners!
+; ============================================
+
+; --- STAP 1: INPUTS DECLAREREN ---
+; Dit zijn signalen die het script binnenkomen
+IN TemperatuurSensor      ; De temperatuur die we meten
+IN StartKnop              ; Knop om ventilator aan te zetten
+
+; --- STAP 2: OUTPUTS DECLAREREN ---
+; Dit zijn signalen die het script verstuurt
+OUT Ventilator            ; De ventilator die we aan/uit zetten
+
+; --- STAP 3: VARIABELEN (optioneel) ---
+VAR Drempelwaarde = 25.0  ; Bij welke temperatuur moet ventilator aan?
+
+; --- STAP 4: PROGRAMMA LOGICA ---
+; Als temperatuur hoger is dan drempelwaarde, zet ventilator aan
+IF TemperatuurSensor > Drempelwaarde THEN
+    Ventilator = ON
+ELSE
+    Ventilator = OFF
+ENDIF
+
+; Als start knop wordt ingedrukt, zet ventilator aan
+IF StartKnop = TRUE THEN
+    Ventilator = ON
+ENDIF
+
+; ============================================
+; UITLEG:
+; ============================================
+; 1. IN = Input (signaal dat binnenkomt)
+; 2. OUT = Output (signaal dat we versturen)
+; 3. VAR = Variabele (waarde die we opslaan)
+; 4. IF-THEN-ELSE = Als-dan-anders logica
+; 5. = ON/OFF = Zet output aan of uit
+; ============================================
+
